@@ -339,6 +339,14 @@
         .btn-warning { background: #fbbc04; color: #1a1a2e; }
         .btn-warning:hover { background: #e5a800; }
         .btn-sm { padding: 0.3rem 1rem; font-size: 0.8rem; }
+        .btn-share { background: #25D366; color: white; }
+        .btn-share:hover { background: #1da851; }
+        .btn-twitter { background: #1DA1F2; color: white; }
+        .btn-twitter:hover { background: #1a8cd8; }
+        .btn-facebook { background: #1877F2; color: white; }
+        .btn-facebook:hover { background: #166fe5; }
+        .btn-link { background: #6c757d; color: white; }
+        .btn-link:hover { background: #5a6268; }
         .hidden { display: none !important; }
         .tag {
             background: #eef2f6;
@@ -465,6 +473,45 @@
         }
         .post-actions { display: flex; gap: 10px; margin-top: 1rem; flex-wrap: wrap; }
         .post-footer { margin-top: 1rem; padding-top: 1rem; border-top: 1px solid #e9edf4; }
+
+        /* Share Dropdown */
+        .share-dropdown {
+            position: relative;
+            display: inline-block;
+        }
+        .share-dropdown-content {
+            display: none;
+            position: absolute;
+            top: 100%;
+            left: 0;
+            background: white;
+            min-width: 200px;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.15);
+            border-radius: 12px;
+            padding: 8px 0;
+            z-index: 100;
+            margin-top: 4px;
+        }
+        .share-dropdown-content.show {
+            display: block;
+        }
+        .share-dropdown-content .btn {
+            display: flex;
+            width: 100%;
+            border-radius: 0;
+            background: transparent;
+            padding: 8px 16px;
+            font-size: 0.85rem;
+            border: none;
+            justify-content: flex-start;
+        }
+        .share-dropdown-content .btn:hover {
+            background: #f0f0f0;
+        }
+        .share-dropdown-content .btn i {
+            width: 20px;
+            margin-right: 8px;
+        }
 
         /* Comments */
         .comments-section { margin-top: 1rem; }
@@ -608,16 +655,45 @@
             color: #5f6b7a;
         }
 
+        /* Toast notification */
+        .toast {
+            position: fixed;
+            bottom: 30px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: #1a1a2e;
+            color: white;
+            padding: 12px 24px;
+            border-radius: 12px;
+            font-size: 0.9rem;
+            z-index: 9999;
+            opacity: 0;
+            transition: opacity 0.3s, transform 0.3s;
+            pointer-events: none;
+            box-shadow: 0 4px 16px rgba(0,0,0,0.3);
+        }
+        .toast.show {
+            opacity: 1;
+            transform: translateX(-50%) translateY(0);
+        }
+
         @media (max-width: 600px) {
             .header-content { flex-direction: column; align-items: stretch; gap: 8px; }
             .user-info-header { justify-content: space-between; }
             .notification-dropdown { width: 300px; right: -20px; }
             .footer-links { flex-direction: column; gap: 10px; }
             .footer-divider { display: none; }
+            .share-dropdown-content {
+                left: auto;
+                right: 0;
+            }
         }
     </style>
 </head>
 <body>
+
+<!-- ===== TOAST ===== -->
+<div id="toast" class="toast">✅ Link copiado!</div>
 
 <!-- ===== BANNED OVERLAY ===== -->
 <div id="bannedOverlay" class="banned-overlay">
@@ -779,6 +855,7 @@ const userBadge = document.getElementById('userBadge');
 const btnLogin = document.getElementById('btnLogin');
 const btnLogout = document.getElementById('btnLogout');
 const bannedOverlay = document.getElementById('bannedOverlay');
+const toast = document.getElementById('toast');
 
 // ============================================
 // UTILIDADES
@@ -820,6 +897,88 @@ function getUrlParams() {
     const params = new URLSearchParams(window.location.search);
     return { uid: params.get('uid'), info: params.has('info') };
 }
+
+function getBlogUrl(uid) {
+    const baseUrl = window.location.origin + window.location.pathname;
+    return `${baseUrl}?uid=${uid}`;
+}
+
+function showToast(message, duration = 3000) {
+    toast.textContent = message;
+    toast.classList.add('show');
+    clearTimeout(toast._timeout);
+    toast._timeout = setTimeout(() => {
+        toast.classList.remove('show');
+    }, duration);
+}
+
+// ============================================
+// COMPARTILHAMENTO
+// ============================================
+function shareBlog(uid, platform) {
+    const url = getBlogUrl(uid);
+    const title = `Blog de ${uid.substring(0, 12)}... - WazzimaGiygg Blog`;
+    
+    let shareUrl = '';
+    switch(platform) {
+        case 'whatsapp':
+            shareUrl = `https://api.whatsapp.com/send?text=${encodeURIComponent(title + '\n' + url)}`;
+            break;
+        case 'twitter':
+            shareUrl = `https://twitter.com/intent/tweet?text=${encodeURIComponent(title)}&url=${encodeURIComponent(url)}`;
+            break;
+        case 'facebook':
+            shareUrl = `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(url)}&quote=${encodeURIComponent(title)}`;
+            break;
+        case 'linkedin':
+            shareUrl = `https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(url)}`;
+            break;
+        case 'telegram':
+            shareUrl = `https://t.me/share/url?url=${encodeURIComponent(url)}&text=${encodeURIComponent(title)}`;
+            break;
+        case 'email':
+            shareUrl = `mailto:?subject=${encodeURIComponent(title)}&body=${encodeURIComponent('Confira este blog:\n\n' + url)}`;
+            break;
+        case 'copy':
+        default:
+            navigator.clipboard.writeText(url).then(() => {
+                showToast('✅ Link copiado para a área de transferência!');
+            }).catch(() => {
+                // Fallback
+                const textArea = document.createElement('textarea');
+                textArea.value = url;
+                document.body.appendChild(textArea);
+                textArea.select();
+                document.execCommand('copy');
+                document.body.removeChild(textArea);
+                showToast('✅ Link copiado para a área de transferência!');
+            });
+            return;
+    }
+    
+    if (shareUrl) {
+        window.open(shareUrl, '_blank', 'width=600,height=500');
+    }
+}
+
+function toggleShareDropdown(event, uid) {
+    event.stopPropagation();
+    const dropdown = event.currentTarget.querySelector('.share-dropdown-content');
+    if (dropdown) {
+        dropdown.classList.toggle('show');
+        // Armazenar o UID no dropdown para uso nos botões
+        dropdown.dataset.uid = uid;
+    }
+}
+
+// Fechar dropdowns ao clicar fora
+document.addEventListener('click', function(e) {
+    document.querySelectorAll('.share-dropdown-content.show').forEach(dropdown => {
+        if (!dropdown.closest('.share-dropdown').contains(e.target)) {
+            dropdown.classList.remove('show');
+        }
+    });
+});
 
 // ============================================
 // AUTENTICAÇÃO
@@ -1121,6 +1280,7 @@ function renderBlog() {
 function renderUserBlog(uid) {
     const isOwner = currentUser && uid === currentUser.uid;
     const container = mainContainer;
+    const blogUrl = getBlogUrl(uid);
 
     // Buscar posts do usuário
     const postsRef = db.collection('blog').doc(uid).collection('posts');
@@ -1133,7 +1293,46 @@ function renderUserBlog(uid) {
                             <h2><i class="fas fa-user"></i> Blog de ${uid.substring(0, 12)}...</h2>
                             <span class="text-muted">${isOwner ? 'Seu blog' : 'Blog público'}</span>
                         </div>
-                        <span class="badge">${snapshot.size} posts</span>
+                        <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+                            <span class="badge">${snapshot.size} posts</span>
+                            <!-- Botão Compartilhar -->
+                            <div class="share-dropdown" onclick="toggleShareDropdown(event, '${uid}')">
+                                <button class="btn btn-share btn-sm">
+                                    <i class="fas fa-share-alt"></i> Compartilhar
+                                </button>
+                                <div class="share-dropdown-content" data-uid="${uid}">
+                                    <button class="btn" onclick="shareBlog('${uid}', 'whatsapp')">
+                                        <i class="fab fa-whatsapp" style="color:#25D366;"></i> WhatsApp
+                                    </button>
+                                    <button class="btn" onclick="shareBlog('${uid}', 'twitter')">
+                                        <i class="fab fa-twitter" style="color:#1DA1F2;"></i> Twitter
+                                    </button>
+                                    <button class="btn" onclick="shareBlog('${uid}', 'facebook')">
+                                        <i class="fab fa-facebook" style="color:#1877F2;"></i> Facebook
+                                    </button>
+                                    <button class="btn" onclick="shareBlog('${uid}', 'linkedin')">
+                                        <i class="fab fa-linkedin" style="color:#0A66C2;"></i> LinkedIn
+                                    </button>
+                                    <button class="btn" onclick="shareBlog('${uid}', 'telegram')">
+                                        <i class="fab fa-telegram" style="color:#26A5E4;"></i> Telegram
+                                    </button>
+                                    <button class="btn" onclick="shareBlog('${uid}', 'email')">
+                                        <i class="fas fa-envelope" style="color:#6c757d;"></i> E-mail
+                                    </button>
+                                    <button class="btn" onclick="shareBlog('${uid}', 'copy')">
+                                        <i class="fas fa-copy" style="color:#6c757d;"></i> Copiar link
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div style="margin-top: 8px; display: flex; gap: 8px; flex-wrap: wrap;">
+                        <code style="background: #f1f5f9; padding: 0.3rem 0.8rem; border-radius: 6px; font-size: 0.8rem; word-break: break-all;">
+                            🔗 ${blogUrl}
+                        </code>
+                        <button class="btn btn-outline btn-sm" onclick="shareBlog('${uid}', 'copy')">
+                            <i class="fas fa-copy"></i> Copiar
+                        </button>
                     </div>
                 </div>
             `;
@@ -1616,11 +1815,14 @@ window.addComment = addComment;
 window.formatText = formatText;
 window.toggleMode = toggleMode;
 window.insertCodeBlock = insertCodeBlock;
+window.shareBlog = shareBlog;
+window.toggleShareDropdown = toggleShareDropdown;
 
 console.log('📝 Blog WazzimaGiygg inicializado com sucesso!');
+console.log('🔗 Use o botão "Compartilhar" para compartilhar o blog!');
 </script>
 
-  <script src="https://gspotfverwazzimagiygg.wazzimagiygg.com/D6FefD0De/EfdFeF1ExcE0C/De0Var6H6f/QXdv0/dddcefb.js"></script>
-  
+<script src="https://gspotfverwazzimagiygg.wazzimagiygg.com/D6FefD0De/EfdFeF1ExcE0C/De0Var6H6f/QXdv0/dddcefb.js"></script>
+
 </body>
 </html>
